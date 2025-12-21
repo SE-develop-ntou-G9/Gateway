@@ -15,12 +15,7 @@ services:
     routes:
       - name: user-route
         protocols: ["http", "https"]
-        paths: 
-          - /users
-          - /drivers
-          - /images
-          - /auth
-          - /notifications
+        paths: ["/v1"]
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
   - name: admin-serv
