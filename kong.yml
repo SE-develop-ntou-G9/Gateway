@@ -1,0 +1,36 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: user-serv
+    url: http://ntouber-user.zeabur.internal:8000
+    routes:
+      - name: v1
+        paths:
+          - /v1
+        strip_path: false
+        protocols:
+          - http
+          - https
+
+  - name: post-serv
+    url: http://ntouber-post.zeabur.internal:8000
+    routes:
+      - name: api
+        paths:
+          - /api
+        strip_path: false
+        protocols:
+          - http
+          - https
+
+  - name: admin-serv
+    url: http://ntouber-admin.zeabur.internal:8000
+    routes:
+      - name: admin
+        paths:
+          - /admin
+        strip_path: false
+        protocols:
+          - http
+          - https
