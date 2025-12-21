@@ -43,8 +43,8 @@ consumers:
 
 jwt_secrets:
   - consumer: user-serv
-    key: ntouber-user-serv      # 會對到 JWT header 的 kid
-    secret: ${JWT_SECRET}
+    key: ntouber-user-serv
+    secret: "{vault://env/JWT_SECRET}"
     algorithm: HS256
 
 plugins:
