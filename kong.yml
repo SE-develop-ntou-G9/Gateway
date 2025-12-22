@@ -72,7 +72,7 @@ services:
   # admin-serv
   # ======================
   - name: admin-serv
-    url: http://admin-serv.zeabur.internal:8080
+    url: http://admin-server.zeabur.internal:8080
     routes:
       - name: admin-protected
         paths:
