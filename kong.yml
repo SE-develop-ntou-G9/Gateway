@@ -11,23 +11,49 @@ services:
   - name: user-serv
     url: http://user-serv.zeabur.internal:8080
     routes:
+      # ✅ 登入：不需要 JWT
       - name: auth-google
-        paths: [/v1/auth/google]
+        paths:
+          - /v1/auth/google
         strip_path: false
         protocols: [http, https]
 
-      - name: v1-protected
-        paths: [/v1]
+      # ✅ 這兩條公開：不需要 JWT
+      - name: v1-public-user-driver
+        paths:
+          # /v1/users/<id>
+          - ~/v1/users/[^/]+$
+          # /v1/drivers/user/<user_id>
+          - ~/v1/drivers/user/[^/]+$
         strip_path: false
         protocols: [http, https]
+
+      # ✅ 其餘 /v1：需要 JWT（排除上面兩條）
+      - name: v1-protected
+        paths:
+          # 任何 /v1 開頭，但不要匹配 /v1/users/<id> 與 /v1/drivers/user/<user_id>
+          - ~/v1(?!/users/[^/]+$)(?!/drivers/user/[^/]+$).*
+        strip_path: false
+        protocols: [http, https]
+
 
   - name: post-serv
     url: http://post-serv.zeabur.internal:8080
     routes:
-      - name: api-protected
-        paths: [/api]
+      # ✅ 公開貼文列表（不需要 JWT）
+      - name: api-posts-public
+        paths:
+          - /api/posts/all
         strip_path: false
         protocols: [http, https]
+
+      # 🔒 其餘 /api 才需要 JWT
+      - name: api-protected
+        paths:
+          - ~/api(?!/posts/all$).*
+        strip_path: false
+        protocols: [http, https]
+
 
   - name: admin-serv
     url: http://admin-serv.zeabur.internal:8080
