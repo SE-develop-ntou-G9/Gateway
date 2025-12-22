@@ -138,6 +138,7 @@ plugins:
         - PUT
         - DELETE
         - OPTIONS
+        - PATCH
       headers:
         - Authorization
         - Content-Type
