@@ -1,12 +1,6 @@
 _format_version: "3.0"
 _transform: true
 
-vaults:
-  - name: env
-    prefix: my-env-vault
-    config:
-      prefix: "SECURE_"
-
 services:
   # ======================
   # user-serv
@@ -14,31 +8,23 @@ services:
   - name: user-serv
     url: http://user-serv.zeabur.internal:8080
     routes:
-      # ✅ 登入（公開）
       - name: auth-google
-        paths:
-          - /v1/auth/google
+        paths: ["/v1/auth/google"]
         strip_path: false
         protocols: [http, https]
 
-      # ✅ 公開：/v1/users/:id
       - name: v1-public-users
-        paths:
-          - /v1/users
+        paths: ["/v1/users"]
         strip_path: false
         protocols: [http, https]
 
-      # ✅ 公開：/v1/drivers/user/:user_id
       - name: v1-public-driver-by-user
-        paths:
-          - /v1/drivers/user
+        paths: ["/v1/drivers/user"]
         strip_path: false
         protocols: [http, https]
 
-      # 🔒 其餘 /v1（需要 JWT）
       - name: v1-protected
-        paths:
-          - /v1
+        paths: ["/v1"]
         strip_path: false
         protocols: [http, https]
 
@@ -48,23 +34,18 @@ services:
   - name: post-serv
     url: http://post-serv.zeabur.internal:8080
     routes:
-      # ✅ 公開：/api/posts/all
       - name: api-posts-public
-        paths:
-          - /api/posts/all
+        paths: ["/api/posts/all"]
         strip_path: false
         protocols: [http, https]
 
       - name: api-posts-search
-        paths:
-          - /api/posts/search
+        paths: ["/api/posts/search"]
         strip_path: false
         protocols: [http, https]
 
-      # 🔒 其餘 /api（需要 JWT）
       - name: api-protected
-        paths:
-          - /api
+        paths: ["/api"]
         strip_path: false
         protocols: [http, https]
 
@@ -72,65 +53,105 @@ services:
   # admin-serv
   # ======================
   - name: admin-serv
-    url: http://admin-server.zeabur.internal:8080
+    url: http://admin-serv.zeabur.internal:8080
     routes:
       - name: admin-protected
-        paths:
-          - /admin
+        paths: ["/admin"]
         strip_path: false
         protocols: [http, https]
 
 # ======================
-# JWT
+# Consumers / JWT
 # ======================
 consumers:
-  - username: user-serv
+  - username: ntouber-user
 
 jwt_secrets:
-  - consumer: user-serv
+  - consumer: ntouber-user
     key: ntouber-user-serv
-    secret: "f96dc63c15c49f1a181ba0d0df75d215381f0c5b12d27487402d66153405da33215da02619237d78f38f9e8bf863a98e"
+    secret: "REPLACE_WITH_YOUR_SECRET"
     algorithm: HS256
 
+# ======================
+# Plugins
+# ======================
 plugins:
-  # 🔒 user-serv /v1
+  # ---------- JWT ----------
   - name: jwt
     route: v1-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
       run_on_preflight: false
-      header_names:
-        - Authorization
 
-  # 🔒 post-serv /api
   - name: jwt
     route: api-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
       run_on_preflight: false
-      header_names:
-        - Authorization
 
-  # 🔒 admin
   - name: jwt
     route: admin-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
       run_on_preflight: false
-      header_names:
-        - Authorization
 
-  # ======================
-  # CORS
-  # ======================
+  # ---------- Rate Limiting ----------
+  # 🔓 公開 API（未登入 / IP）
+  - name: rate-limiting
+    route: api-posts-public
+    config:
+      minute: 60
+      hour: 1000
+      limit_by: ip
+      policy: local
+      fault_tolerant: true
+
+  - name: rate-limiting
+    route: api-posts-search
+    config:
+      minute: 60
+      hour: 1000
+      limit_by: ip
+      policy: local
+      fault_tolerant: true
+
+  # 🔒 已登入使用者（JWT / Consumer）
+  - name: rate-limiting
+    route: v1-protected
+    config:
+      minute: 300
+      hour: 5000
+      limit_by: consumer
+      policy: local
+      fault_tolerant: true
+
+  - name: rate-limiting
+    route: api-protected
+    config:
+      minute: 300
+      hour: 5000
+      limit_by: consumer
+      policy: local
+      fault_tolerant: true
+
+  # 🔐 Admin（最嚴格）
+  - name: rate-limiting
+    route: admin-protected
+    config:
+      minute: 30
+      hour: 300
+      limit_by: consumer
+      policy: local
+      fault_tolerant: true
+
+  # ---------- CORS ----------
   - name: cors
     config:
       origins:
         - https://ntouber.zeabur.app
-        - http://localhost:8080
         - http://localhost:5173
       methods:
         - GET
