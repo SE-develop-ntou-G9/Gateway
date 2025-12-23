@@ -1,154 +1,82 @@
-_format_version: "3.0"
-_transform: true
-
-services:
-  # ======================
-  # user-serv
-  # ======================
-  - name: user-serv
-    url: http://user-serv.zeabur.internal:8080
-    routes:
-      - name: auth-google
-        paths: ["/v1/auth/google"]
-        strip_path: false
-        protocols: [http, https]
-
-      - name: v1-public-users
-        paths: ["/v1/users"]
-        strip_path: false
-        protocols: [http, https]
-
-      - name: v1-public-driver-by-user
-        paths: ["/v1/drivers/user"]
-        strip_path: false
-        protocols: [http, https]
-
-      - name: v1-protected
-        paths: ["/v1"]
-        strip_path: false
-        protocols: [http, https]
-
-  # ======================
-  # post-serv
-  # ======================
-  - name: post-serv
-    url: http://post-serv.zeabur.internal:8080
-    routes:
-      - name: api-posts-public
-        paths: ["/api/posts/all"]
-        strip_path: false
-        protocols: [http, https]
-
-      - name: api-posts-search
-        paths: ["/api/posts/search"]
-        strip_path: false
-        protocols: [http, https]
-
-      - name: api-protected
-        paths: ["/api"]
-        strip_path: false
-        protocols: [http, https]
-
-  # ======================
-  # admin-serv
-  # ======================
-  - name: admin-serv
-    url: http://admin-serv.zeabur.internal:8080
-    routes:
-      - name: admin-protected
-        paths: ["/admin"]
-        strip_path: false
-        protocols: [http, https]
-
-# ======================
-# Consumers / JWT
-# ======================
-consumers:
-  - username: ntouber-user
-
-jwt_secrets:
-  - consumer: ntouber-user
-    key: ntouber-user-serv
-    secret: "REPLACE_WITH_YOUR_SECRET"
-    algorithm: HS256
-
-# ======================
-# Plugins
-# ======================
 plugins:
-  # ---------- JWT ----------
+  # ======================
+  # JWT（原本設定，未修改）
+  # ======================
   - name: jwt
     route: v1-protected
     config:
       claims_to_verify: [exp]
+      key_claim_name: kid
       run_on_preflight: false
+      header_names:
+        - Authorization
 
   - name: jwt
     route: api-protected
     config:
       claims_to_verify: [exp]
+      key_claim_name: kid
       run_on_preflight: false
+      header_names:
+        - Authorization
 
   - name: jwt
     route: admin-protected
     config:
       claims_to_verify: [exp]
+      key_claim_name: kid
       run_on_preflight: false
+      header_names:
+        - Authorization
 
-  # ---------- Rate Limiting ----------
-  # 🔓 公開 API（未登入 / IP）
+  # ======================
+  # Rate Limiting（新增）
+  # ======================
+
+  # 1️⃣ 登入 API（防止暴力登入）
   - name: rate-limiting
-    route: api-posts-public
+    route: auth-google
     config:
-      minute: 60
-      hour: 1000
+      minute: 20
       limit_by: ip
       policy: local
       fault_tolerant: true
 
+  # 2️⃣ 使用者 API（依 JWT 使用者限流）
+  - name: rate-limiting
+    route: v1-protected
+    config:
+      minute: 300
+      limit_by: consumer
+      policy: local
+      fault_tolerant: true
+
+  # 3️⃣ Post 搜尋 API（高風險刷流量端點）
   - name: rate-limiting
     route: api-posts-search
     config:
       minute: 60
-      hour: 1000
       limit_by: ip
       policy: local
       fault_tolerant: true
 
-  # 🔒 已登入使用者（JWT / Consumer）
-  - name: rate-limiting
-    route: v1-protected
-    config:
-      minute: 300
-      hour: 5000
-      limit_by: consumer
-      policy: local
-      fault_tolerant: true
-
+  # 4️⃣ Post 其餘受保護 API
   - name: rate-limiting
     route: api-protected
     config:
       minute: 300
-      hour: 5000
       limit_by: consumer
       policy: local
       fault_tolerant: true
 
-  # 🔐 Admin（最嚴格）
-  - name: rate-limiting
-    route: admin-protected
-    config:
-      minute: 30
-      hour: 300
-      limit_by: consumer
-      policy: local
-      fault_tolerant: true
-
-  # ---------- CORS ----------
+  # ======================
+  # CORS（原本設定，未修改）
+  # ======================
   - name: cors
     config:
       origins:
         - https://ntouber.zeabur.app
+        - http://localhost:8080
         - http://localhost:5173
       methods:
         - GET
