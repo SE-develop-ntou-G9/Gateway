@@ -2,84 +2,165 @@ _format_version: "3.0"
 _transform: true
 
 services:
-  - name: post-serv
-    url: http://post-serv.zeabur.internal:8080
-    routes:
-      - name: post-route
-        protocols: ["http", "https"]
-        paths: ["/api/posts"]
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-
+  # ======================
+  # user-serv
+  # ======================
   - name: user-serv
     url: http://user-serv.zeabur.internal:8080
     routes:
-      - name: user-route
-        protocols: ["http", "https"]
-        paths: ["/v1"]
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      - name: auth-google
+        paths: ["/v1/auth/google"]
+        strip_path: false
+        protocols: [http, https]
 
+      - name: v1-public-users
+        paths: ["/v1/users"]
+        strip_path: false
+        protocols: [http, https]
+
+      - name: v1-public-driver-by-user
+        paths: ["/v1/drivers/user"]
+        strip_path: false
+        protocols: [http, https]
+
+      - name: v1-protected
+        paths: ["/v1"]
+        strip_path: false
+        protocols: [http, https]
+
+  # ======================
+  # post-serv
+  # ======================
+  - name: post-serv
+    url: http://post-serv.zeabur.internal:8080
+    routes:
+      - name: api-posts-public
+        paths: ["/api/posts/all"]
+        strip_path: false
+        protocols: [http, https]
+
+      - name: api-posts-search
+        paths: ["/api/posts/search"]
+        strip_path: false
+        protocols: [http, https]
+
+      - name: api-protected
+        paths: ["/api"]
+        strip_path: false
+        protocols: [http, https]
+
+  # ======================
+  # admin-serv
+  # ======================
   - name: admin-serv
     url: http://admin-serv.zeabur.internal:8080
     routes:
-      - name: admin-route
-        protocols: ["http", "https"]
+      - name: admin-protected
         paths: ["/admin"]
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        strip_path: false
+        protocols: [http, https]
 
+# ======================
+# Consumers / JWT
+# ======================
+consumers:
+  - username: ntouber-user
+
+jwt_secrets:
+  - consumer: ntouber-user
+    key: ntouber-user-serv
+    secret: "REPLACE_WITH_YOUR_SECRET"
+    algorithm: HS256
+
+# ======================
+# Plugins
+# ======================
 plugins:
-  - name: cors
-    service: post-serv
+  # ---------- JWT ----------
+  - name: jwt
+    route: v1-protected
     config:
-      origins: ["*"]
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-      headers: ["Content-Type", "Authorization"]
-      exposed_headers: ["Authorization"]
-      credentials: true
-      max_age: 3600
+      claims_to_verify: [exp]
+      run_on_preflight: false
 
-  - name: rate-limiting
-    service: post-serv
+  - name: jwt
+    route: api-protected
     config:
-      minute: 10000
+      claims_to_verify: [exp]
+      run_on_preflight: false
+
+  - name: jwt
+    route: admin-protected
+    config:
+      claims_to_verify: [exp]
+      run_on_preflight: false
+
+  # ---------- Rate Limiting ----------
+  # 🔓 公開 API（未登入 / IP）
+  - name: rate-limiting
+    route: api-posts-public
+    config:
+      minute: 60
+      hour: 1000
       limit_by: ip
       policy: local
       fault_tolerant: true
-      hide_client_headers: false
-
-  - name: cors
-    service: user-serv
-    config:
-      origins: ["*"]
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-      headers: ["Content-Type", "Authorization"]
-      exposed_headers: ["Authorization"]
-      credentials: true
-      max_age: 3600
 
   - name: rate-limiting
-    service: user-serv
+    route: api-posts-search
     config:
-      minute: 10000
+      minute: 60
+      hour: 1000
       limit_by: ip
       policy: local
       fault_tolerant: true
-      hide_client_headers: false
 
-  - name: cors
-    service: admin-serv
-    config:
-      origins: ["*"]
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-      headers: ["Content-Type", "Authorization"]
-      exposed_headers: ["Authorization"]
-      credentials: true
-      max_age: 3600
-
+  # 🔒 已登入使用者（JWT / Consumer）
   - name: rate-limiting
-    service: admin-serv
+    route: v1-protected
     config:
-      minute: 10000
-      limit_by: ip
+      minute: 300
+      hour: 5000
+      limit_by: consumer
       policy: local
       fault_tolerant: true
-      hide_client_headers: false
+
+  - name: rate-limiting
+    route: api-protected
+    config:
+      minute: 300
+      hour: 5000
+      limit_by: consumer
+      policy: local
+      fault_tolerant: true
+
+  # 🔐 Admin（最嚴格）
+  - name: rate-limiting
+    route: admin-protected
+    config:
+      minute: 30
+      hour: 300
+      limit_by: consumer
+      policy: local
+      fault_tolerant: true
+
+  # ---------- CORS ----------
+  - name: cors
+    config:
+      origins:
+        - https://ntouber.zeabur.app
+        - http://localhost:5173
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+        - PATCH
+      headers:
+        - Authorization
+        - Content-Type
+      exposed_headers:
+        - Authorization
+      credentials: false
+      max_age: 3600
