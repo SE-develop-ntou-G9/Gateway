@@ -1,9 +1,10 @@
 plugins:
   # ======================
-  # JWT（原本設定，未修改）
+  # JWT（原設定）
   # ======================
   - name: jwt
-    route: v1-protected
+    route:
+      name: v1-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
@@ -12,7 +13,8 @@ plugins:
         - Authorization
 
   - name: jwt
-    route: api-protected
+    route:
+      name: api-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
@@ -21,7 +23,8 @@ plugins:
         - Authorization
 
   - name: jwt
-    route: admin-protected
+    route:
+      name: admin-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
@@ -30,39 +33,43 @@ plugins:
         - Authorization
 
   # ======================
-  # Rate Limiting（新增）
+  # Rate Limiting（修正後）
   # ======================
 
-  # 1️⃣ 登入 API（防止暴力登入）
+  # 1️⃣ 登入 API
   - name: rate-limiting
-    route: auth-google
+    route:
+      name: auth-google
     config:
       minute: 20
       limit_by: ip
       policy: local
       fault_tolerant: true
 
-  # 2️⃣ 使用者 API（依 JWT 使用者限流）
+  # 2️⃣ 使用者 API（JWT）
   - name: rate-limiting
-    route: v1-protected
+    route:
+      name: v1-protected
     config:
       minute: 300
       limit_by: consumer
       policy: local
       fault_tolerant: true
 
-  # 3️⃣ Post 搜尋 API（高風險刷流量端點）
+  # 3️⃣ Post 搜尋
   - name: rate-limiting
-    route: api-posts-search
+    route:
+      name: api-posts-search
     config:
       minute: 60
       limit_by: ip
       policy: local
       fault_tolerant: true
 
-  # 4️⃣ Post 其餘受保護 API
+  # 4️⃣ Post 受保護 API
   - name: rate-limiting
-    route: api-protected
+    route:
+      name: api-protected
     config:
       minute: 300
       limit_by: consumer
@@ -70,7 +77,7 @@ plugins:
       fault_tolerant: true
 
   # ======================
-  # CORS（原本設定，未修改）
+  # CORS（原設定）
   # ======================
   - name: cors
     config:
