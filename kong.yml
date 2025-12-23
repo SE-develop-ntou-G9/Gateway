@@ -1,10 +1,101 @@
+_format_version: "3.0"
+_transform: true
+
+vaults:
+  - name: env
+    prefix: my-env-vault
+    config:
+      prefix: "SECURE_"
+
+services:
+  # ======================
+  # user-serv
+  # ======================
+  - name: user-serv
+    url: http://user-serv.zeabur.internal:8080
+    routes:
+      # ✅ 登入（公開）
+      - name: auth-google
+        paths:
+          - /v1/auth/google
+        strip_path: false
+        protocols: [http, https]
+
+      # ✅ 公開：/v1/users/:id
+      - name: v1-public-users
+        paths:
+          - /v1/users
+        strip_path: false
+        protocols: [http, https]
+
+      # ✅ 公開：/v1/drivers/user/:user_id
+      - name: v1-public-driver-by-user
+        paths:
+          - /v1/drivers/user
+        strip_path: false
+        protocols: [http, https]
+
+      # 🔒 其餘 /v1（需要 JWT）
+      - name: v1-protected
+        paths:
+          - /v1
+        strip_path: false
+        protocols: [http, https]
+
+  # ======================
+  # post-serv
+  # ======================
+  - name: post-serv
+    url: http://post-serv.zeabur.internal:8080
+    routes:
+      # ✅ 公開：/api/posts/all
+      - name: api-posts-public
+        paths:
+          - /api/posts/all
+        strip_path: false
+        protocols: [http, https]
+
+      - name: api-posts-search
+        paths:
+          - /api/posts/search
+        strip_path: false
+        protocols: [http, https]
+
+      # 🔒 其餘 /api（需要 JWT）
+      - name: api-protected
+        paths:
+          - /api
+        strip_path: false
+        protocols: [http, https]
+
+  # ======================
+  # admin-serv
+  # ======================
+  - name: admin-serv
+    url: http://admin-server.zeabur.internal:8080
+    routes:
+      - name: admin-protected
+        paths:
+          - /admin
+        strip_path: false
+        protocols: [http, https]
+
+# ======================
+# JWT
+# ======================
+consumers:
+  - username: user-serv
+
+jwt_secrets:
+  - consumer: user-serv
+    key: ntouber-user-serv
+    secret: "f96dc63c15c49f1a181ba0d0df75d215381f0c5b12d27487402d66153405da33215da02619237d78f38f9e8bf863a98e"
+    algorithm: HS256
+
 plugins:
-  # ======================
-  # JWT（原設定）
-  # ======================
+  # 🔒 user-serv /v1
   - name: jwt
-    route:
-      name: v1-protected
+    route: v1-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
@@ -12,9 +103,9 @@ plugins:
       header_names:
         - Authorization
 
+  # 🔒 post-serv /api
   - name: jwt
-    route:
-      name: api-protected
+    route: api-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
@@ -22,9 +113,9 @@ plugins:
       header_names:
         - Authorization
 
+  # 🔒 admin
   - name: jwt
-    route:
-      name: admin-protected
+    route: admin-protected
     config:
       claims_to_verify: [exp]
       key_claim_name: kid
@@ -32,44 +123,27 @@ plugins:
       header_names:
         - Authorization
 
-  # ======================
-  # Rate Limiting（修正後）
-  # ======================
-
-  # 1️⃣ 登入 API
+  # 使用者 API（JWT）
   - name: rate-limiting
-    route:
-      name: auth-google
-    config:
-      minute: 20
-      limit_by: ip
-      policy: local
-      fault_tolerant: true
-
-  # 2️⃣ 使用者 API（JWT）
-  - name: rate-limiting
-    route:
-      name: v1-protected
+    route: v1-protected
     config:
       minute: 300
       limit_by: consumer
       policy: local
       fault_tolerant: true
 
-  # 3️⃣ Post 搜尋
+  # Post search API（公開）
   - name: rate-limiting
-    route:
-      name: api-posts-search
+    route: api-posts-search
     config:
-      minute: 60
+      minute: 100
       limit_by: ip
       policy: local
       fault_tolerant: true
 
-  # 4️⃣ Post 受保護 API
+  # Post 受保護 API
   - name: rate-limiting
-    route:
-      name: api-protected
+    route: api-protected
     config:
       minute: 300
       limit_by: consumer
@@ -77,7 +151,7 @@ plugins:
       fault_tolerant: true
 
   # ======================
-  # CORS（原設定）
+  # CORS
   # ======================
   - name: cors
     config:
